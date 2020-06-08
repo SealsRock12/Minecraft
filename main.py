@@ -61,8 +61,8 @@ class Model:
         return self.queue.popleft()
 
     def gen_terrain(self):
-        for x in range(100):
-            for z in range(100):
+        for x in range(10):
+            for z in range(10):
                 self.gen_block(x, z)
 
 
@@ -75,6 +75,8 @@ class Model:
 
     def _gen_block(self, x, z):
         y = self.perlin(abs(x), abs(z))
+        for yy in range(0, y):
+            self.add_block((x, yy, z), GRASS)
         self.add_block((x, y, z), GRASS)
 
     def gen_block(self,x, z, immediate=False):
