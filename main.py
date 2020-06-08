@@ -41,6 +41,8 @@ class Block(object):
 class GrassBlock(Block):
     files = ['grass_block_side.png','grass_block_top.png','dirt.png']
 
+GRASS = GrassBlock()
+
 class Model:
     queue = deque()
     def __init__(self, player):
@@ -49,6 +51,7 @@ class Model:
         self.shown = {}
         self._shown = {}
         self.player = player
+        self.perlin = terrain.Perlin()
         self.gen_terrain()
 
     def inqueue(self, func, *args):
@@ -58,8 +61,8 @@ class Model:
         return self.queue.popleft()
 
     def gen_terrain(self):
-        for x in range(1000):
-            for z in range(1000):
+        for x in range(100):
+            for z in range(100):
                 self.gen_block(x, z)
 
 
@@ -71,8 +74,8 @@ class Model:
             self.hide_block(pos)
 
     def _gen_block(self, x, z):
-        y = terrain.perlin(abs(x), abs(z))
-        self.add_block((x, y, z), GrassBlock())
+        y = self.perlin(abs(x), abs(z))
+        self.add_block((x, y, z), GRASS)
 
     def gen_block(self,x, z, immediate=False):
         if immediate:
