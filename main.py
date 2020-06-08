@@ -5,6 +5,14 @@ import terrain
 from collections import defaultdict, deque
 
 xrange = range
+FACES = [
+    ( 0, 1, 0),
+    ( 0,-1, 0),
+    (-1, 0, 0),
+    ( 1, 0, 0),
+    ( 0, 0, 1),
+    ( 0, 0,-1),
+]
 
 def normalize(position):
     """ Accepts `position` of arbitrary precision and returns the block
@@ -41,7 +49,11 @@ class Block(object):
 class GrassBlock(Block):
     files = ['grass_block_side.png','grass_block_top.png','dirt.png']
 
+class DirtBlock(Block):
+    files = ['dirt.png', 'dirt.png', 'dirt.png']
+
 GRASS = GrassBlock()
+DIRT = DirtBlock()
 
 class Model:
     queue = deque()
@@ -76,7 +88,7 @@ class Model:
     def _gen_block(self, x, z):
         y = self.perlin(abs(x), abs(z))
         for yy in range(0, y):
-            self.add_block((x, yy, z), GRASS)
+            self.add_block((x, yy, z), DIRT)
         self.add_block((x, y, z), GRASS)
 
     def gen_block(self,x, z, immediate=False):
@@ -131,7 +143,7 @@ class Model:
         cube = (self.batch.add(4, GL_QUADS, right, ('v3f', (x1, y1, z1, x1, y1, z2, x1, y2, z2, x1, y2, z1)), tex_coords),
         self.batch.add(4, GL_QUADS, left, ('v3f', (x2, y1, z2, x2, y1, z1, x2, y2, z1, x2, y2, z2)), tex_coords),
         self.batch.add(4, GL_QUADS, bottom, ('v3f', (x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2)), tex_coords),
-        self.batch.add(4, GL_QUADS, top, ('v3f', (x1, y2, z2, x2, y2, z2, x2, y2, z1, x1, y2, z1)), tex_coords),
+        self.batch.add(4, GL_QUADS, top, ('v3f', (x1, y2, z2, x2, y2, z2, x2, y2, z1, x1, y2, z1)), tex_coords, ('c3B',((124,252,0)*4))),
         self.batch.add(4, GL_QUADS, back, ('v3f', (x2, y1, z1, x1, y1, z1, x1, y2, z1, x2, y2, z1)), tex_coords),
         self.batch.add(4, GL_QUADS, front, ('v3f', (x1, y1, z2, x2, y1, z2, x2, y2, z2, x1, y2, z2)), tex_coords))
         self._shown[(x, y, z)] = cube
@@ -192,6 +204,8 @@ class Player:
     def __init__(self,pos=(0,0,0),rot=(0,0)):
         self.pos = list(pos)
         self.rot = list(rot)
+        self.noclip = False
+        self.flying = False
 
     def mouse_motion(self,dx,dy):
         dx/=8; dy/=8; self.rot[0]+=dy; self.rot[1]-=dx
@@ -209,6 +223,7 @@ class Player:
 
         if keys[key.SPACE]: self.pos[1]+=s
         if keys[key.LSHIFT]: self.pos[1]-=s
+
 
 class Window(pyglet.window.Window):
     def push(self,pos,rot): glPushMatrix(); glRotatef(-rot[0],1,0,0); glRotatef(-rot[1],0,1,0); glTranslatef(-pos[0],-pos[1],-pos[2],)
@@ -228,7 +243,7 @@ class Window(pyglet.window.Window):
         self.push_handlers(self.keys)
         pyglet.clock.schedule(self.update)
 
-        self.player = Player((0.5, 1.5, 1.5), (-30, 0))
+        self.player = Player((-1, -1, -1), (-30, 0))
         self.model = Model(self.player)
 
     def on_mouse_motion(self, x, y, dx, dy):
@@ -238,10 +253,28 @@ class Window(pyglet.window.Window):
     def on_key_press(self, KEY, MOD):
         if KEY == key.Q: self.mouse_lock = not self.mouse_lock
         if KEY == key.M: self.model.hide_block((0, 0, 0))
-
+    
     def update(self, dt):
         self.player.update(dt,self.keys)
         self.model.update()
+        self.player.pos = self.collide(self.player.pos)
+    
+    def collide(self,pos):
+        if self.player.noclip and self.player.flying: return pos
+        pad = 0.25
+        p = list(pos); np = normalize(pos)
+        for face in ((-1,0,0),(1,0,0),(0,-1,0),(0,1,0),(0,0,-1),(0,0,1)):
+            for i in (0,1,2):
+                if not face[i]: continue
+                d = (p[i]-np[i])*face[i]
+                if d<pad: continue
+                for dy in (0,1):
+                    op = list(np); op[1]-=dy; op[i]+=face[i]
+                    if tuple(op) in self.model.world:
+                        p[i]-=(d-pad)*face[i]
+                        if face[1]: self.dy = 0
+                        break
+        return list(p)
 
 
     def on_draw(self):
