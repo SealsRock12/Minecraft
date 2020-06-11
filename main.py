@@ -12,6 +12,8 @@ FACES = [
     ( 1, 0, 0),
     ( 0, 0, 1),
     ( 0, 0,-1),
+    (1, 0, 1),
+    (-1, 0, -1)
 ]
 
 def normalize(position):
@@ -29,7 +31,15 @@ def normalize(position):
     return (x, y, z)
 
 
-
+class Colorizer:
+    def colorize(self):
+        pass
+    
+class GrassColorizer(Colorizer):
+    def colorize(self, y):
+        # Colorize block based on y level.
+        color = (0, 255, 50+y)
+        return ('c3B', color*4)
 
 
 class Block(object):
@@ -57,6 +67,7 @@ DIRT = DirtBlock()
 
 class Model:
     queue = deque()
+    sectorqueue = deque()
     def __init__(self, player):
         self.batch = pyglet.graphics.Batch()
         self.world = defaultdict(lambda: None)
@@ -65,16 +76,23 @@ class Model:
         self.player = player
         self.perlin = terrain.Perlin()
         self.gen_terrain()
+        self.grasscolorizer = GrassColorizer()
 
     def inqueue(self, func, *args):
         self.queue.append([func, args])
 
     def outqueue(self):
         return self.queue.popleft()
+    
+    def insectorqueue(self, func, *args):
+        self.sectorqueue.append([func, args])
+
+    def outsectorqueue(self):
+        return self.sectorqueue.popleft()
 
     def gen_terrain(self):
-        for x in range(10):
-            for z in range(10):
+        for x in range(100):
+            for z in range(100):
                 self.gen_block(x, z)
 
 
@@ -139,11 +157,12 @@ class Model:
         tex_coords = ("t2f", (0, 0, 1, 0, 1, 1, 0, 1))
         x1, y1, z1 = x, y, z
         x2, y2, z2 = x + 1, y + 1, z + 1
+        color = self.grasscolorizer.colorize(y)
 
         cube = (self.batch.add(4, GL_QUADS, right, ('v3f', (x1, y1, z1, x1, y1, z2, x1, y2, z2, x1, y2, z1)), tex_coords),
         self.batch.add(4, GL_QUADS, left, ('v3f', (x2, y1, z2, x2, y1, z1, x2, y2, z1, x2, y2, z2)), tex_coords),
         self.batch.add(4, GL_QUADS, bottom, ('v3f', (x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2)), tex_coords),
-        self.batch.add(4, GL_QUADS, top, ('v3f', (x1, y2, z2, x2, y2, z2, x2, y2, z1, x1, y2, z1)), tex_coords, ('c3B',((124,252,0)*4))),
+        self.batch.add(4, GL_QUADS, top, ('v3f', (x1, y2, z2, x2, y2, z2, x2, y2, z1, x1, y2, z1)), tex_coords, color),
         self.batch.add(4, GL_QUADS, back, ('v3f', (x2, y1, z1, x1, y1, z1, x1, y2, z1, x2, y2, z1)), tex_coords),
         self.batch.add(4, GL_QUADS, front, ('v3f', (x1, y1, z2, x2, y1, z2, x2, y2, z2, x1, y2, z2)), tex_coords))
         self._shown[(x, y, z)] = cube
@@ -245,6 +264,9 @@ class Window(pyglet.window.Window):
 
         self.player = Player((-1, -1, -1), (-30, 0))
         self.model = Model(self.player)
+        import time
+        time.sleep(5)
+        
 
     def on_mouse_motion(self, x, y, dx, dy):
         if self.mouse_lock:
@@ -259,30 +281,47 @@ class Window(pyglet.window.Window):
         self.model.update()
         self.player.pos = self.collide(self.player.pos)
     
-    def collide(self,pos):
-        if self.player.noclip and self.player.flying: return pos
+    def collide(self, position, height=2): 
+        # How much overlap with a dimension of a surrounding block you need to
+        # have to count as a collision. If 0, touching terrain at all counts as
+        # a collision. If .49, you sink into the ground, as if walking through
+        # tall grass. If >= .5, you'll fall through the ground.
         pad = 0.25
-        p = list(pos); np = normalize(pos)
-        for face in ((-1,0,0),(1,0,0),(0,-1,0),(0,1,0),(0,0,-1),(0,0,1)):
-            for i in (0,1,2):
-                if not face[i]: continue
-                d = (p[i]-np[i])*face[i]
-                if d<pad: continue
-                for dy in (0,1):
-                    op = list(np); op[1]-=dy; op[i]+=face[i]
-                    if tuple(op) in self.model.world:
-                        p[i]-=(d-pad)*face[i]
-                        if face[1]: self.dy = 0
-                        break
+        p = list(position)
+        np = normalize(position)
+        for face in FACES:  # check all surrounding blocks
+            for i in range(3):  # check each dimension independently
+                # How much overlap you have with this dimension.
+                d = (p[i] - np[i]) * face[i]
+                if d < pad:
+                    continue
+                for dy in range(height):  # check each height
+                    op = list(np)
+                    op[1] -= dy
+                    op[i] += face[i]
+                    if tuple(op) not in self.model.world:
+                        continue
+                    p[i] -= (d - pad) * face[i]
+                    if face == (0, -1, 0):
+                        # You are colliding with the ground or ceiling, so stop
+                        # falling / rising.
+                        self.dy = 0
+                    if face == (0, 1, 0):
+                        self.dy = 0
+                    break
         return list(p)
 
 
-    def on_draw(self):
+    def on-draw(self):
         self.clear()
         self.set3d()
         self.push(self.player.pos,self.player.rot)
         self.model.draw()
         glPopMatrix()
+    
+    def on_draw(self):
+        if not self.mainmenu:
+            self.on_draw()
 
 
 if __name__ == '__main__':
