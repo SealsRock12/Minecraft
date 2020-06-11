@@ -23,6 +23,8 @@ from ..exceptions import (
 )
 
 
+OVERWORLD = 10
+NETHER = 9
 STATE_STATUS = 1
 STATE_PLAYING = 2
 
@@ -32,7 +34,7 @@ class ConnectionContext(object):
     shared by the Connection class with other classes, such as Packet.
     Importantly, it can be used without knowing the interface of Connection.
     """
-    def __init__(self, **kwds):
+    def __init__(self, dimension=OVERWORLD, **kwds):
         self.protocol_version = kwds.get('protocol_version')
 
 
@@ -619,7 +621,7 @@ class PacketReactor(object):
             packet_data = packets.PacketBuffer()
             packet_data.send(stream.read(length))
             # Ensure we read all the packet
-            while len(packet_data.get_writable()) < length:
+            while len(packet_da a.get_writable()) < length:
                 packet_data.send(
                     stream.read(length - len(packet_data.get_writable())))
             packet_data.reset_cursor()
