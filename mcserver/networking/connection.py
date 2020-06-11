@@ -763,7 +763,8 @@ class PlayingReactor(PacketReactor):
 
         elif packet.packet_name == "disconnect":
             self.connection.disconnect()
-
+        elif packet.packet_name == "chunk data":
+            print(packet) #debug
 
 class StatusReactor(PacketReactor):
     get_clientbound_packets = staticmethod(clientbound.status.get_packets)

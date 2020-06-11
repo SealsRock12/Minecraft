@@ -9,7 +9,7 @@ from minecraft.networking.types import (
 class ChunkDataPacket(Packet):
     @staticmethod
     def get_id(context):
-        return 0x22 # FIXME
+        return 0x22
 
     packet_name = 'chunk data'
     fields = 'x', 'bit_mask_y', 'z', 'full_chunk'
