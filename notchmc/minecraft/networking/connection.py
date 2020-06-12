@@ -621,7 +621,7 @@ class PacketReactor(object):
             packet_data = packets.PacketBuffer()
             packet_data.send(stream.read(length))
             # Ensure we read all the packet
-            while len(packet_da a.get_writable()) < length:
+            while len(packet_data.get_writable()) < length:
                 packet_data.send(
                     stream.read(length - len(packet_data.get_writable())))
             packet_data.reset_cursor()
